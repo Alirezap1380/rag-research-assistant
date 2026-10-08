@@ -1,0 +1,11 @@
+.venv/
+.git/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+data/papers/*.pdf
+data/text/
+data/chunks.jsonl
+tests/
+eval/
+.env
