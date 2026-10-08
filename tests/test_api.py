@@ -60,6 +60,20 @@ def test_ask_maps_llm_errors(client, status, expected):
     assert client.post("/ask", json={"question": "q?"}).status_code == expected
 
 
+@pytest.mark.parametrize("config_dir_set", [False, True])
+def test_ask_without_any_credentials_is_503_not_500(client, monkeypatch, tmp_path, config_dir_set):
+    """No key, token or profile: the real SDK fails client-side (TypeError, or
+    CredentialsError when a config dir is named) before any request is sent."""
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_PROFILE", "ANTHROPIC_CONFIG_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))  # no ~/.config/anthropic profile
+    if config_dir_set:
+        monkeypatch.setenv("ANTHROPIC_CONFIG_DIR", str(tmp_path))
+    main.app.dependency_overrides.pop(main.get_llm_client)  # exercise the real client construction
+    r = client.post("/ask", json={"question": "q?"})
+    assert r.status_code == 503 and "credentials" in r.json()["detail"]
+
+
 def test_health_reports_retriever_state(monkeypatch):
     monkeypatch.setattr(main, "get_retriever", lambda: (_ for _ in ()).throw(RuntimeError("no index")))
     r = TestClient(main.app).get("/health")

@@ -9,7 +9,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from api.schemas import AskRequest, AskResponse, HealthResponse, SearchHit, SearchRequest, SearchResponse
 from src import generate
@@ -25,6 +26,13 @@ app = FastAPI(
     description="Retrieval over arXiv ML papers with citation-grounded answers.",
     version="0.1.0",
 )
+
+
+@app.exception_handler(generate.LLMNotConfigured)
+def llm_not_configured(request: Request, exc: generate.LLMNotConfigured) -> JSONResponse:
+    # Raised either when the client is constructed (a dependency, outside the endpoint)
+    # or on the first request; /search keeps working without credentials.
+    return JSONResponse(status_code=503, content={"detail": "LLM credentials are missing or invalid"})
 
 
 @lru_cache(maxsize=1)

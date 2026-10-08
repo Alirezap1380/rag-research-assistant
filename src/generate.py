@@ -40,6 +40,10 @@ papers distinct instead of blending their claims. Be concise: a few short paragr
 at most, no headings."""
 
 
+class LLMNotConfigured(RuntimeError):
+    """No Anthropic credentials could be resolved (no API key, auth token or profile)."""
+
+
 @dataclass
 class Source:
     n: int  # 1-based number used in the rendered answer
@@ -141,23 +145,37 @@ def get_client():
     import anthropic
 
     # Resolves ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / an `ant auth login` profile.
-    return anthropic.Anthropic()
+    try:
+        return anthropic.Anthropic()
+    except anthropic.CredentialsError as e:  # a named config dir / profile that can't be loaded
+        raise LLMNotConfigured(str(e)) from e
 
 
 def answer_question(question: str, retriever: Retriever, k: int = 5, client=None) -> Answer:
     hits = retriever.search(question, k=k)
     if not hits:
         return Answer(question=question, answer="No passages were retrieved for this question.")
+    import anthropic
+
     client = client or get_client()
-    response = client.beta.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": build_user_content(question, hits)}],
-        output_config={"effort": EFFORT},
-        betas=[FALLBACK_BETA],
-        fallbacks="default",
-    )
+    try:
+        response = client.beta.messages.create(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": build_user_content(question, hits)}],
+            output_config={"effort": EFFORT},
+            betas=[FALLBACK_BETA],
+            fallbacks="default",
+        )
+    except anthropic.CredentialsError as e:  # ANTHROPIC_CONFIG_DIR / profile set but unusable
+        raise LLMNotConfigured(str(e)) from e
+    except TypeError as e:
+        # With no credentials at all the SDK fails client-side with a TypeError while
+        # building headers, before any request (so it is not an AuthenticationError).
+        if "authentication" in str(e).lower():
+            raise LLMNotConfigured(str(e)) from e
+        raise
     return parse_response(question, hits, response)
 
 
