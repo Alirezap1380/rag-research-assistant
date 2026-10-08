@@ -28,6 +28,14 @@ CHUNKS_PATH = DATA_DIR / "chunks.jsonl"
 METADATA_PATH = PAPERS_DIR / "metadata.json"
 TEXT_DIR = DATA_DIR / "text"  # parsed-text cache so re-chunking skips pdfplumber
 
+# pdfplumber's defaults (x_tolerance=3pt) merged adjacent words in tightly-kerned
+# LaTeX PDFs: 40/50 papers had glued tokens like "Thissectionprovidesthebackground"
+# (7% of all tokens), invisible to BM25 and garbling embeddings. A tolerance relative
+# to font size fixes that, and following the PDF's text flow reads two-column papers
+# column by column instead of interleaving lines from both columns.
+PARSE_SETTINGS = {"x_tolerance_ratio": 0.15, "use_text_flow": True}
+PARSER_TAG = "xr015-flow"  # bump when PARSE_SETTINGS change, so cached text is not reused
+
 # arXiv's query parser does not give AND higher precedence than OR: without the
 # parentheses this parsed as `A OR B OR (C AND cats)` and 22 of the top 40 hits
 # were outside cs.CL/cs.LG (cs.CV, cs.RO, ...). Verified against the live API.
@@ -169,11 +177,11 @@ def fetch_papers(
 
 
 def parse_pdf_cached(paper: PaperMeta) -> str:
-    cache = TEXT_DIR / (_safe_filename(paper.arxiv_id)[: -len(".pdf")] + ".txt")
+    cache = TEXT_DIR / PARSER_TAG / (_safe_filename(paper.arxiv_id)[: -len(".pdf")] + ".txt")
     if cache.exists():
         return cache.read_text()
     text = parse_pdf(DATA_DIR.parent / paper.pdf_path)
-    TEXT_DIR.mkdir(parents=True, exist_ok=True)
+    cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(text)
     return text
 
@@ -183,7 +191,7 @@ def parse_pdf(pdf_path: Path) -> str:
     text_parts = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
-            page_text = page.extract_text()
+            page_text = page.extract_text(**PARSE_SETTINGS)
             if page_text:
                 text_parts.append(page_text)
     return "\n\n".join(text_parts)

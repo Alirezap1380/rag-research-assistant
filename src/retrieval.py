@@ -19,6 +19,12 @@ DATA_DIR = ROOT / "data"
 DEFAULT_CHUNKS_PATH = DATA_DIR / "chunks.jsonl"
 DEFAULT_CHROMA_DIR = ROOT / "chroma_db"
 
+# Served configuration: the winner of the retrieval eval (eval/results.md). BM25 over
+# 250-token chunks beat dense and RRF-hybrid on every metric; hybrid only tied it on
+# the questions with the least word overlap. Switch with RAG_RETRIEVAL_MODE.
+SERVED_MODE = "bm25"
+SERVED_CHUNKS_PATH = DATA_DIR / "chunks_250.jsonl"
+
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 # BGE v1.5 is trained with this instruction on the query side only (passages are
 # embedded raw). fastembed's query_embed() does not add it, so we do.
