@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+data/papers/*.pdf
+data/chunks/
+chroma_db/
+.env
+*.egg-info/
+.DS_Store
+data/text/
+# Full-text chunks are derived from arXiv PDFs (regenerate with `python src/ingest.py`)
+data/chunks*.jsonl

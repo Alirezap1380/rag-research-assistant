@@ -1,0 +1,7 @@
+# Pinned: the original ingestion bug was an unpinned `arxiv` upgrade that removed
+# Result.download_pdf, failing every download silently.
+arxiv==4.0.0
+pdfplumber==0.11.10
+requests
+tiktoken==0.13.0
+langchain-text-splitters==1.1.2
